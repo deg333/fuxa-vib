@@ -260,7 +260,7 @@ for n in range(1, NAXES + 1):
     parts.append(text(x + 170, FY + 62, "RMS", 12, DIM)); value(x + CW - 20, FY + 62, f"{a}.TorqueRMS", "%", 14, TXT, "end", "#0.0", f"{a} torque rms")
     parts.append(text(x + 52, FY + 82, "Temperature", 12, DIM)); value(x + 150, FY + 82, f"{a}.Temperature", "°C", 14, TXT, "end", "#0.0", f"{a} temp (footer)")
 
-overview = {"id": "v_overview", "name": "Overview", "profile": {"width": W, "height": H, "bkcolor": BG},
+overview = {"id": "v_overview", "name": "Overview", "type": "svg", "profile": {"width": W, "height": H, "bkcolor": BG},
             "items": items, "variables": {},
             "svgcontent": f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" '
                           f'xmlns:html="http://www.w3.org/1999/xhtml"><g><title>Layer 1</title>{"".join(parts)}</g></svg>'}
@@ -314,7 +314,7 @@ for n in range(1, NAXES + 1):
         yy = 222 + i * 38
         parts2.append(text(x + 20, yy + 4, lbl, 13, DIM))
         input_box(x + 190, yy - 14, 90, 24, f"Axis{n}.{p}", f"Axis{n} {lbl}")
-setup = {"id": "v_setup", "name": "Mechanism setup", "profile": {"width": W, "height": H, "bkcolor": BG},
+setup = {"id": "v_setup", "name": "Mechanism setup", "type": "svg", "profile": {"width": W, "height": H, "bkcolor": BG},
          "items": items2, "variables": {},
          "svgcontent": f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" '
                        f'xmlns:html="http://www.w3.org/1999/xhtml"><g><title>Layer 1</title>{"".join(parts2)}</g></svg>'}
