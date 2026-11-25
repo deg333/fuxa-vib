@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate vibration-monitor.fuxap (FUXA project) for the OPC UA servo-axis simulator.
+"""Generate vibration-monitor.fuxap (FUXA project) for the OPC UA simulator:
+servo-axis vibration monitor + 7-unit AC energy monitor + manual load shedding.
 
 Edit THRESHOLDS below to change warning / alarm levels, then re-run:
     python3 build_project.py
@@ -10,6 +11,7 @@ import json, uuid, itertools, os
 OPC_URL = os.environ.get("OPCUA_URL", "opc.tcp://localhost:4840/UA/VibrationSim")
 NS = 2                       # namespace index of urn:vibmon:sim in the simulator
 NAXES = 5
+NAC = 7                      # AC units
 DEV_ID = "d_opcua_vibsim"
 DEV_NAME = "VibSim"
 
@@ -23,6 +25,9 @@ THRESHOLDS = {
 }
 COL_OK, COL_WARN, COL_ALARM, COL_OFF = "#2ecc71", "#f5a623", "#e74c3c", "#7f8c8d"
 AXIS_COLORS = ["#4da3ff", "#2ecc71", "#f5a623", "#e056fd", "#ff6b6b"]
+AC_COLORS = ["#4da3ff", "#2ecc71", "#f5a623", "#e056fd", "#ff6b6b", "#1abc9c", "#f1c40f"]
+AC_RATED_KW = [3.5, 3.5, 5.0, 5.0, 7.5, 2.5, 10.0]   # keep in sync with sim/server.js (shown on the shed page)
+PAGES = [("Overview", "v_overview"), ("Energy", "v_energy"), ("Load shedding", "v_shed"), ("Mechanism setup", "v_setup")]
 
 _ids = itertools.count(1)
 def uid(prefix): return f"{prefix}{uuid.uuid4()}"
@@ -51,6 +56,16 @@ for n in range(1, NAXES + 1):
               "Friction", "Imbalance", "Looseness", "BearingWear", "Misalignment"):
         add_tag(f"Axis{n}.{p}")
 
+for n in range(1, NAC + 1):
+    add_tag(f"AC{n}.Enable", "Boolean")
+    add_tag(f"AC{n}.Running", "Boolean")
+    for o in ("Power", "Current", "RoomTemp", "Energy", "PowerFactor"):
+        add_tag(f"AC{n}.{o}", daq=o in ("Power", "Current", "RoomTemp", "Energy"))
+    add_tag(f"AC{n}.SetTemp")
+    add_tag(f"AC{n}.RatedPower")
+for o in ("TotalPower", "TotalEnergy", "ShedPower", "UnitsRunning", "UnitsShed"):
+    add_tag(f"Energy.{o}", daq=o in ("TotalPower", "TotalEnergy", "ShedPower"))
+
 device = {
     "id": DEV_ID, "name": DEV_NAME, "type": "OPCUA", "enabled": True,
     "polling": 500,
@@ -69,6 +84,10 @@ def mk_chart(cid, name, sig):
                    "lines": [line(f"Axis{n}.{sig}", f"Axis {n}", AXIS_COLORS[n - 1]) for n in range(1, NAXES + 1)]})
 mk_chart("c_vel", "Velocity RMS (mm/s)", "VelRMS")
 mk_chart("c_acc", "Acceleration RMS (g)", "AccRMS")
+charts.append({"id": "c_pow", "name": "AC power per unit (kW)",
+               "lines": [line(f"AC{n}.Power", f"AC {n}", AC_COLORS[n - 1]) for n in range(1, NAC + 1)]})
+charts.append({"id": "c_tot", "name": "Total AC power (kW)",
+               "lines": [line("Energy.TotalPower", "Total power", "#4da3ff"), line("Energy.ShedPower", "Shed (est.)", "#e74c3c")]})
 
 # ---------------------------------------------------------------- alarms
 def sub(enabled, lo, hi, text, group, bk, col):
@@ -187,6 +206,15 @@ def nav_button(plist, idict, x, y, w, h, label, view_id, name):
                    "label": "HtmlButton",
                   "property": ev({"events": [{"type": "click", "action": "onpage", "actparam": view_id, "actoptions": {}}]})}
 
+def nav(plist, idict, current):
+    """page buttons: stacked in the Overview header (space is tight), one row at the top right elsewhere"""
+    others = [p for p in PAGES if p[1] != current]
+    for i, (label, view) in enumerate(others):
+        if current == "v_overview":
+            nav_button(plist, idict, 1150, 16 + 30 * i, 150, 26, label, view, f"Go to {label}")
+        else:
+            nav_button(plist, idict, 1580 - len(others) * 148 + 8 + i * 148, 16, 140, 26, label, view, f"Go to {label}")
+
 def axis_key(x_right, y):
     """coloured axis key in a chart header row (the charts use hover tooltips instead of a legend)"""
     for n in range(NAXES, 0, -1):
@@ -206,7 +234,7 @@ parts.append(text(20, 80 - 0, "", 1))
 
 parts.append(text(800, 14, "ACTIVE ALARMS", 11, DIM, "middle", True))
 alarm_table(480, 18, 640, 118)
-nav_button(parts, items, 1150, 16, 150, 26, "Mechanism setup", "v_setup", "Go to setup")
+nav(parts, items, "v_overview")
 
 th = THRESHOLDS
 parts.append(text(1580, 40, "Warning / Alarm levels", 12, DIM, "end", True))
@@ -243,7 +271,7 @@ for n in range(1, NAXES + 1):
             ("Speed", "Speed", "rpm", "###0.0"), ("Temperature", "Temperature", "°C", "#0.0")]
     for i, (lbl, sig, unit, fmt) in enumerate(rows):
         yy = CY + 62 + i * 21
-        parts.append(text(x + 20, yy, lbl, 13, DIM))
+        parts.append(text(x + 20, yy, f"{lbl} ({unit})", 13, DIM))
         value(x + CW - 20, yy, f"{a}.{sig}", unit, 14, TXT, "end", fmt, f"{a} {lbl}")
 
 # footer: torque
@@ -290,7 +318,7 @@ def sw_button(x, y, w, h, tag, label, val, color, name):
 
 parts2.append(rect(0, 0, W, H, BG))
 parts2.append(text(20, 34, "MECHANISM SETUP", 24, TXT, bold=True))
-nav_button(parts2, items2, 1430, 16, 150, 26, "Overview", "v_overview", "Go to overview")
+nav(parts2, items2, "v_setup")
 parts2.append(text(20, 58, "Adjust the simulated mechanisms; every axis follows the virtual master axis (position = ratio × master + phase + cam).", 13, DIM))
 parts2.append(rect(20, 74, 1560, 66, CARD, 6))
 parts2.append(text(40, 100, "Master speed (rpm)", 14, TXT)); input_box(200, 82, 90, 24, "Master.Speed", "Master speed setpoint")
@@ -319,18 +347,150 @@ setup = {"id": "v_setup", "name": "Mechanism setup", "type": "svg", "profile": {
          "svgcontent": f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" '
                        f'xmlns:html="http://www.w3.org/1999/xhtml"><g><title>Layer 1</title>{"".join(parts2)}</g></svg>'}
 
+
+# ---------------------------------------------------------------- shared helpers for the AC pages
+def view_doc(vid_, name, plist, idict):
+    return {"id": vid_, "name": name, "type": "svg", "profile": {"width": W, "height": H, "bkcolor": BG},
+            "items": idict, "variables": {},
+            "svgcontent": f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" '
+                          f'xmlns:html="http://www.w3.org/1999/xhtml"><g><title>Layer 1</title>{"".join(plist)}</g></svg>'}
+
+def kpi(plist, x, y, w, h, label, tag, unit, fmt, color=TXT):
+    plist.append(rect(x, y, w, h, CARD, 6))
+    plist.append(text(x + 16, y + 22, label, 12, DIM, "start", True))
+    value(x + 16, y + h - 14, tag, unit, 26, color, "start", fmt, label)
+
+def run_light(cx, cy, tag, r=9, name=None):
+    """green = running, red = shed / off (boolean tag, 1 / 0)"""
+    wid = uid("GSE_")
+    P.append(f'<g id="{wid}" type="svg-ext-gauge_semaphore" fill="#000000" stroke="#000000" font-size="14" font-family="sans-serif">'
+             f'<ellipse id="{uid("GSE_")}" cx="{cx}" cy="{cy}" rx="{r}" ry="{r}" fill="{COL_OFF}" stroke="#000000"/></g>')
+    I[wid] = {"id": wid, "type": "svg-ext-gauge_semaphore", "name": name or tag, "label": "HtmlSemaphore",
+              "property": ev({}, tag, [{"type": "range", "min": "0", "max": "0", "color": COL_ALARM},
+                                       {"type": "range", "min": "1", "max": "1", "color": COL_OK}])}
+
+def switch(x, y, w, h, tag, name):
+    """FUXA toggle switch bound to a boolean tag: ON = unit allowed to run, SHED = switched off"""
+    wid = uid("HXT_")
+    P.append(f'<g id="{wid}" type="svg-ext-html_switch" fill="#FFFFFF" font-size="13" font-family="sans-serif" stroke="#000000">'
+             f'<rect id="{uid("svg_")}" x="{x}" y="{y}" width="{w}" height="{h}" fill="#cccccc" stroke-width="0" stroke="null"/>'
+             f'<foreignObject id="{uid("H-HXT_")}" x="{x}" y="{y}" width="{w}" height="{h}">'
+             f'<DIV id="{uid("T-HXT_")}" style="width: 100%; height: 100%; vector-effect: non-scaling-stroke;"></DIV></foreignObject></g>')
+    I[wid] = {"id": wid, "type": "svg-ext-html_switch", "name": name, "label": "HtmlSwitch",
+              "property": ev({"options": {"offValue": 0, "onValue": 1, "offBackground": "#c0392b", "onBackground": "#27ae60",
+                                          "offText": "SHED", "onText": "ON", "offSliderColor": "#ffffff", "onSliderColor": "#ffffff",
+                                          "offTextColor": "#ffffff", "onTextColor": "#ffffff", "fontSize": 13, "fontFamily": "",
+                                          "radius": 14, "height": h}}, tag)}
+
+def in_box(x, y, w, h, tag, name):
+    wid = uid("HXI_")
+    P.append(f'<g id="{wid}" type="svg-ext-html_input" stroke="#000000" font-family="sans-serif" font-size="13" fill="#f1f1f1ff">'
+             f'<rect id="{uid("svg_")}" x="{x}" y="{y}" width="{w}" height="{h}" fill="#ffffff" stroke-width="0" stroke="null"/>'
+             f'<foreignObject id="{uid("H-HXI_")}" x="{x}" y="{y}" width="{w}" height="{h}">'
+             f'<INPUT id="{uid("I-HXI_")}" style="width: calc(100% - 7px); height: calc(100% - 7px); text-align: right; border: unset; '
+             f'background-color: rgb(255, 255, 255); color: rgb(0, 0, 0); vector-effect: non-scaling-stroke;" type="text"/></foreignObject></g>')
+    I[wid] = {"id": wid, "type": "svg-ext-html_input", "name": name, "label": "HtmlInput",
+              "property": ev({"options": {"updated": True, "type": "number", "numeric": True}}, tag)}
+
+# ---------------------------------------------------------------- Energy monitor view
+items3, parts3 = {}, []
+P, I = parts3, items3
+parts3.append(rect(0, 0, W, H, BG))
+parts3.append(text(20, 34, "ENERGY MONITOR", 24, TXT, bold=True))
+parts3.append(text(20, 58, f"{NAC} AC units · power, current and energy per unit", 13, DIM))
+nav(parts3, items3, "v_energy")
+for i, (lbl, tag, unit, fmt, col) in enumerate([("TOTAL POWER (kW)", "Energy.TotalPower", "kW", "#0.0", "#4da3ff"),
+                                                  ("ENERGY SINCE START (kWh)", "Energy.TotalEnergy", "kWh", "#0.000", TXT),
+                                                  ("UNITS RUNNING", "Energy.UnitsRunning", "of %d" % NAC, "#0", COL_OK),
+                                                  ("POWER SHED, est. (kW)", "Energy.ShedPower", "kW", "#0.0", COL_ALARM)]):
+    kpi(parts3, 20 + i * 393, 74, 380, 66, lbl, tag, unit, fmt, col)
+
+parts3.append(text(20, 156, "POWER PER UNIT (kW)  –  live", 12, DIM, "start", True))
+parts3.append(text(810, 156, "TOTAL POWER (kW)  –  live", 12, DIM, "start", True))
+chart(20, 162, 770, 224, "c_pow", "realtime1", "Live power per unit", 12)
+chart(810, 162, 770, 224, "c_tot", "realtime1", "Live total power", 40)
+parts3.append(text(20, 404, "POWER PER UNIT (kW)  –  history", 12, DIM, "start", True))
+parts3.append(text(810, 404, "TOTAL POWER (kW)  –  history", 12, DIM, "start", True))
+chart(20, 410, 770, 224, "c_pow", "history", "History power per unit", 12)
+chart(810, 410, 770, 224, "c_tot", "history", "History total power", 40)
+for n in range(NAC, 0, -1):                                   # colour key for the per-unit charts
+    parts3.append(text(790 - (NAC - n) * 66, 156, f"■ AC {n}", 12, AC_COLORS[n - 1], "end", True))
+    parts3.append(text(790 - (NAC - n) * 66, 404, f"■ AC {n}", 12, AC_COLORS[n - 1], "end", True))
+parts3.append(text(1580, 156, "■ Total   ", 12, "#4da3ff", "end", True))
+parts3.append(text(1580, 404, "■ Total   ", 12, "#4da3ff", "end", True))
+parts3.append(text(1500, 156, "■ Shed (est.)", 12, "#e74c3c", "end", True))
+parts3.append(text(1500, 404, "■ Shed (est.)", 12, "#e74c3c", "end", True))
+
+ACW, ACG, ACY, ACH = 214, 10, 648, 296
+for n in range(1, NAC + 1):
+    x = 20 + (n - 1) * (ACW + ACG)
+    a = f"AC{n}"
+    parts3.append(rect(x, ACY, ACW, ACH, CARD, 6))
+    parts3.append(rect(x, ACY, 6, ACH, AC_COLORS[n - 1], 3))
+    parts3.append(text(x + 20, ACY + 30, f"AC {n}", 18, TXT, bold=True))
+    run_light(x + ACW - 24, ACY + 24, f"{a}.Running", 9, f"{a} running")
+    parts3.append(text(x + 20, ACY + 74, "POWER (kW)", 11, DIM, "start", True))
+    value(x + 20, ACY + 104, f"{a}.Power", "kW", 28, TXT, "start", "#0.00", f"{a} power")
+    rows = [("Current (A)", "Current", "A", "#0.0"), ("Power factor", "PowerFactor", "", "#0.00"),
+            ("Energy (kWh)", "Energy", "kWh", "#0.000"), ("Room temp (°C)", "RoomTemp", "°C", "#0.0"),
+            ("Setpoint (°C)", "SetTemp", "°C", "#0.0"), ("Rated (kW)", "RatedPower", "kW", "#0.0")]
+    for i, (lbl, sig, unit, fmt) in enumerate(rows):
+        yy = ACY + 140 + i * 24
+        parts3.append(text(x + 20, yy, lbl, 13, DIM))
+        value(x + ACW - 16, yy, f"{a}.{sig}", unit, 14, TXT, "end", fmt, f"{a} {lbl}")
+energy = view_doc("v_energy", "Energy", parts3, items3)
+
+# ---------------------------------------------------------------- Load shedding view
+items4, parts4 = {}, []
+P, I = parts4, items4
+parts4.append(rect(0, 0, W, H, BG))
+parts4.append(text(20, 34, "LOAD SHEDDING", 24, TXT, bold=True))
+parts4.append(text(20, 58, "Switch a unit to SHED to cut its power. The light shows the real state: green = running, red = shed / off. "
+                           "A unit switched back on restarts after a 3 s lock-out.", 13, DIM))
+nav(parts4, items4, "v_shed")
+for i, (lbl, tag, unit, fmt, col) in enumerate([("TOTAL POWER (kW)", "Energy.TotalPower", "kW", "#0.0", "#4da3ff"),
+                                                  ("UNITS RUNNING", "Energy.UnitsRunning", "of %d" % NAC, "#0", COL_OK),
+                                                  ("UNITS SHED", "Energy.UnitsShed", "", "#0", COL_ALARM),
+                                                  ("POWER SHED, est. (kW)", "Energy.ShedPower", "kW", "#0.0", COL_ALARM)]):
+    kpi(parts4, 20 + i * 393, 74, 380, 66, lbl, tag, unit, fmt, col)
+
+COLS = {"name": 40, "light": 215, "switch": 270, "power": 560, "rated": 700, "room": 850, "set": 1010, "energy": 1190, "current": 1360}
+hy = 176
+for key, label, anchor in [("name", "UNIT", "start"), ("light", "STATE", "middle"), ("switch", "SWITCH", "start"), ("power", "POWER (kW)", "end"),
+                           ("rated", "RATED (kW)", "end"), ("room", "ROOM TEMP (°C)", "end"), ("set", "SETPOINT °C (editable)", "start"),
+                           ("energy", "ENERGY (kWh)", "end"), ("current", "CURRENT (A)", "end")]:
+    parts4.append(text(COLS[key], hy, label, 11, DIM, anchor, True))
+RY, RH = 190, 88
+for n in range(1, NAC + 1):
+    y = RY + (n - 1) * (RH + 6)
+    a = f"AC{n}"
+    parts4.append(rect(20, y, 1560, RH, CARD, 6))
+    parts4.append(rect(20, y, 6, RH, AC_COLORS[n - 1], 3))
+    parts4.append(text(COLS["name"], y + RH / 2 + 8, f"AC {n}", 22, TXT, bold=True))
+    run_light(COLS["light"], y + RH / 2, f"{a}.Running", 16, f"{a} state")
+    switch(COLS["switch"], y + RH / 2 - 18, 150, 36, f"{a}.Enable", f"{a} switch")
+    value(COLS["power"], y + RH / 2 + 8, f"{a}.Power", "kW", 22, TXT, "end", "#0.00", f"{a} power")
+    value(COLS["rated"], y + RH / 2 + 8, f"{a}.RatedPower", "kW", 16, DIM, "end", "#0.0", f"{a} rated")
+    value(COLS["room"], y + RH / 2 + 8, f"{a}.RoomTemp", "°C", 18, TXT, "end", "#0.0", f"{a} room temp")
+    in_box(COLS["set"], y + RH / 2 - 14, 80, 28, f"{a}.SetTemp", f"{a} setpoint")
+    value(COLS["energy"], y + RH / 2 + 8, f"{a}.Energy", "kWh", 16, TXT, "end", "#0.000", f"{a} energy")
+    value(COLS["current"], y + RH / 2 + 8, f"{a}.Current", "A", 16, TXT, "end", "#0.0", f"{a} current")
+shed = view_doc("v_shed", "Load shedding", parts4, items4)
+
 # ---------------------------------------------------------------- project
 project = {
     "version": "1.01",
-    "name": "Vibration Monitor",
+    "name": "Vibration & Energy Monitor",
     "devices": {DEV_ID: device},
     "hmi": {
-        "views": [overview, setup],
+        "views": [overview, energy, shed, setup],
         "layout": {"start": "v_overview",
                    "navigation": {"mode": "over", "type": "inline",
                                   "items": [{"icon": "dashboard", "view": "v_overview", "link": "", "text": "Overview"},
+                                            {"icon": "bolt", "view": "v_energy", "link": "", "text": "Energy"},
+                                            {"icon": "power_settings_new", "view": "v_shed", "link": "", "text": "Load shedding"},
                                             {"icon": "tune", "view": "v_setup", "link": "", "text": "Mechanism setup"}]},
-                   "header": {"title": "Vibration Monitor"}},
+                   "header": {"title": "Vibration & Energy Monitor"}},
     },
     "charts": charts,
     "alarms": alarms,

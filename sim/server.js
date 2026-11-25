@@ -1,4 +1,5 @@
-// OPC UA simulator: 1 machine, virtual master axis, up to 5 servo axes with adjustable mechanisms.
+// OPC UA simulator: 1 machine, virtual master axis, up to 5 servo axes with adjustable mechanisms,
+// plus 7 AC units for the energy monitor / manual load-shedding pages.
 // Vibration (velocity RMS mm/s, acceleration RMS g) is synthesised from the kinematics
 // (follower of the master axis) plus the mechanism parameters (imbalance, looseness, bearing wear, ...).
 const { OPCUAServer, Variant, DataType, StatusCodes } = require("node-opcua");
@@ -167,6 +168,65 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
       vars[a.k.Temperature] = s.temp;
     }
   }, TICK_MS);
+
+  // ---------------------------------------------------------------- 7 AC units (energy monitor + manual load shedding)
+  // AC<n>.Enable is the shed switch (writable): true = unit allowed to run, false = shed (compressor + fan off).
+  // AC<n>.Running is the indicator (follows Enable; a 3 s restart lock-out when a unit is switched back on).
+  const NAC = 7;
+  const AC_RATED_KW = [3.5, 3.5, 5.0, 5.0, 7.5, 2.5, 10.0];     // electrical kW with the compressor running
+  const OUTDOOR_C = 32;
+  const acs = [];
+  for (let n = 1; n <= NAC; n++) {
+    const p = { name: `AC${n}`, obj: ns.addObject({ componentOf: machine, browseName: `AC${n}`, nodeId: `s=AC${n}` }) };
+    const k = {
+      Enable:      addVar(p, "Enable", DataType.Boolean, true, true),
+      Running:     addVar(p, "Running", DataType.Boolean, true, false),
+      SetTemp:     addVar(p, "SetTemp", DataType.Double, 24, true),
+      RatedPower:  addVar(p, "RatedPower", DataType.Double, AC_RATED_KW[n - 1], true),
+      Power:       addVar(p, "Power", DataType.Double, 0, false),        // kW
+      Current:     addVar(p, "Current", DataType.Double, 0, false),      // A
+      PowerFactor: addVar(p, "PowerFactor", DataType.Double, 0.9, false),
+      Energy:      addVar(p, "Energy", DataType.Double, 0, false),       // kWh since simulator start
+      RoomTemp:    addVar(p, "RoomTemp", DataType.Double, 23 + Math.random() * 2, false),
+    };
+    acs.push({ n, k, comp: Math.random() < 0.5, startAt: 0, heat: 0.016 + 0.002 * n });
+  }
+  const E = { name: "Energy", obj: ns.addObject({ componentOf: machine, browseName: "Energy", nodeId: "s=Energy" }) };
+  const EK = {
+    TotalPower:   addVar(E, "TotalPower", DataType.Double, 0, false),    // kW
+    TotalEnergy:  addVar(E, "TotalEnergy", DataType.Double, 0, false),   // kWh
+    ShedPower:    addVar(E, "ShedPower", DataType.Double, 0, false),     // kW not being drawn because units are shed (estimate)
+    UnitsRunning: addVar(E, "UnitsRunning", DataType.Double, NAC, false),
+    UnitsShed:    addVar(E, "UnitsShed", DataType.Double, 0, false),
+  };
+  const AC_MS = 500, acDt = AC_MS / 1000;
+  setInterval(() => {
+    let total = 0, shed = 0, running = 0;
+    for (const u of acs) {
+      const g = (x) => vars[u.k[x]];
+      const rated = g("RatedPower"), set = g("SetTemp");
+      let T = g("RoomTemp"), kw, pf;
+      const enabled = g("Enable");
+      if (enabled && !g("Running")) { if (!u.startAt) u.startAt = Date.now() + 3000; if (Date.now() >= u.startAt) { vars[u.k.Running] = true; u.startAt = 0; } }
+      if (!enabled) { vars[u.k.Running] = false; u.startAt = 0; u.comp = false; }
+      const on = g("Running");
+      if (on) {                                                        // thermostat, +-0.8 C deadband
+        if (T > set + 0.8) u.comp = true; else if (T < set - 0.8) u.comp = false;
+      }
+      const cool = on && u.comp ? 0.06 : 0;
+      T += (u.heat * (1 + Math.max(0, T - 24) / 20) - cool) * acDt * 4 + (Math.random() - 0.5) * 0.004;
+      T = clamp(T, 18, OUTDOOR_C + 2);
+      if (!on) { kw = 0.005 * rated; pf = 0.5; }                        // standby / shed
+      else if (u.comp) { kw = rated * (0.92 + 0.08 * Math.random()); pf = 0.88 + 0.04 * Math.random(); }
+      else { kw = 0.06 * rated * (0.95 + 0.1 * Math.random()); pf = 0.6; } // fan only
+      const amps = (kw * 1000) / (Math.sqrt(3) * 400 * pf);
+      vars[u.k.RoomTemp] = T; vars[u.k.Power] = kw; vars[u.k.Current] = amps; vars[u.k.PowerFactor] = pf;
+      vars[u.k.Energy] += kw * acDt / 3600;
+      total += kw; if (on) running++; else shed += rated * 0.35;       // 35 % = typical average duty of a running unit
+    }
+    vars[EK.TotalPower] = total; vars[EK.TotalEnergy] += total * acDt / 3600;
+    vars[EK.ShedPower] = shed; vars[EK.UnitsRunning] = running; vars[EK.UnitsShed] = NAC - running;
+  }, AC_MS);
 
   await server.start();
   console.log(`OPC UA simulator running at ${server.getEndpointUrl()}  (namespace index ${nsIdx}, ${NS_URI})`);
