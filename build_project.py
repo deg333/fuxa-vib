@@ -160,11 +160,13 @@ def progress(x, y, w, h, tag, vmax, color, name=None):
     I[wid] = {"id": wid, "type": "svg-ext-gauge_progress", "name": name or tag, "label": "HtmlProgress",
                   "property": ev({}, tag, [{"type": "minmax", "min": 0, "max": str(vmax), "style": [True, True], "color": color}])}
 
+CHART_DEAD = 53   # FUXA reserves ~53 px below the plot (legend/title space) even with the legend off: the container is made
+                  # that much taller than the visible panel so the plot fills the panel; the overhang is covered by what follows
 def chart(x, y, w, h, chart_id, ctype, name, ymax):
     wid = uid("HXC_")
     P.append(f'<g id="{wid}" type="svg-ext-html_chart" fill="#FFFFFF" font-size="14" font-family="sans-serif" stroke="#000000">'
                  f'<rect id="{uid("svg_")}" x="{x}" y="{y}" width="{w}" height="{h}" fill="{PANEL}" stroke-width="0" stroke="null"/>'
-                 f'<foreignObject id="{uid("H-HXC_")}" x="{x}" y="{y}" width="{w}" height="{h}">'
+                 f'<foreignObject id="{uid("H-HXC_")}" x="{x}" y="{y}" width="{w}" height="{h + CHART_DEAD}">'
                  f'<DIV id="{uid("D-HXC_")}" style="width: 100%; height: 100%; vector-effect: non-scaling-stroke;"></DIV></foreignObject></g>')
     I[wid] = {"id": wid, "type": "svg-ext-html_chart", "name": name, "label": "HtmlChart",
                   "property": {"id": chart_id, "type": ctype, "options": {
@@ -174,7 +176,7 @@ def chart(x, y, w, h, chart_id, ctype, name, ymax):
                       "realtime": 5, "loadOldValues": True, "lastRange": "last8h", "decimalsPrecision": 2,
                       "scaleY1min": 0, "scaleY1max": ymax, "axisLabelX": "", "axisLabelY1": "",
                       "mouseWheelScroll": False, "mouseWheelZoom": False, "staticChart": False,
-                      "dateFormat": "MM_DD_YYYY", "timeFormat": "hh_mm_ss_AA", "width": w, "height": h, "series": []}}}
+                      "dateFormat": "MM_DD_YYYY", "timeFormat": "hh_mm_ss_AA", "width": w, "height": h + CHART_DEAD, "series": []}}}
 
 def alarm_table(x, y, w, h):
     wid = uid("OXC_")
