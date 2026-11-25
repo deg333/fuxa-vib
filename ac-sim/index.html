@@ -80,6 +80,12 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
     </section>
   </div>
 
+  <section class="panel">
+    <h2>3D view <span class="note" style="font-weight:400">drag to rotate, scroll or pinch to zoom</span></h2>
+    <div id="v3" style="height:380px;border-radius:8px;overflow:hidden;background:var(--chip);touch-action:none"></div>
+    <p class="note" id="v3note">Massing model from the dimensions above. Sun position and shadows follow the date and hour. Roof units and wall panel joints are illustrative; dock doors, windows and the roofline are not modeled.</p>
+  </section>
+
   <div class="tiles" id="tiles"></div>
 
   <section class="panel">
@@ -116,6 +122,8 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
   </section>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function(){
 var LAT=34.1286, LON=-117.37, LSTM=-120;
@@ -209,6 +217,62 @@ function sim(n,occDay,p,c,off){
  return out;
 }
 function sum(a,f){return a.reduce(function(s,x){return s+f(x)},0)}
+
+// ---------- 3D ----------
+var V={ready:false,key:''};
+function lbl(txt,col){var c=document.createElement('canvas');c.width=256;c.height=64;var g=c.getContext('2d');g.font='600 30px sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineWidth=6;g.strokeStyle='rgba(255,255,255,.9)';g.strokeText(txt,128,32);g.fillStyle=col;g.fillText(txt,128,32);
+ var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.scale.set(64,16,1);return sp}
+function panelTex(rep){var c=document.createElement('canvas');c.width=256;c.height=128;var g=c.getContext('2d');g.fillStyle='#c9c6bd';g.fillRect(0,0,256,128);g.strokeStyle='#8f8c84';g.lineWidth=3;g.beginPath();g.moveTo(1,0);g.lineTo(1,128);g.stroke();g.strokeStyle='#a9a69d';g.lineWidth=1;g.beginPath();g.moveTo(0,100);g.lineTo(256,100);g.stroke();
+ var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,1);return t}
+function init3d(){
+ var el=$('v3');if(!window.THREE){el.innerHTML='<p class="note" style="padding:16px">3D view could not load.</p>';return}
+ try{
+ V.r=new THREE.WebGLRenderer({antialias:true});V.r.setPixelRatio(Math.min(2,window.devicePixelRatio||1));V.r.shadowMap.enabled=true;
+ el.appendChild(V.r.domElement);V.r.domElement.style.display='block';
+ V.s=new THREE.Scene();V.cam=new THREE.PerspectiveCamera(40,1,1,6000);V.cam.position.set(380,260,480);
+ V.hemi=new THREE.HemisphereLight(0xdfeaff,0x8a7a5a,0.55);V.s.add(V.hemi);
+ V.sun=new THREE.DirectionalLight(0xfff2dd,1.1);V.sun.castShadow=true;V.sun.shadow.mapSize.set(2048,2048);
+ var sc=V.sun.shadow.camera;sc.left=-450;sc.right=450;sc.top=450;sc.bottom=-450;sc.near=10;sc.far=2500;V.s.add(V.sun);V.s.add(V.sun.target);
+ var gr=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400),new THREE.MeshLambertMaterial({color:0xb7a98a}));gr.rotation.x=-Math.PI/2;gr.receiveShadow=true;V.s.add(gr);
+ var pad=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshLambertMaterial({color:0x8d8a84}));pad.rotation.x=-Math.PI/2;pad.position.y=0.15;pad.receiveShadow=true;V.pad=pad;V.s.add(pad);
+ V.grp=new THREE.Group();V.s.add(V.grp);V.lab=new THREE.Group();V.s.add(V.lab);
+ V.ctl=THREE.OrbitControls?new THREE.OrbitControls(V.cam,V.r.domElement):null;
+ if(V.ctl){V.ctl.maxPolarAngle=Math.PI/2.05;V.ctl.enableDamping=false;V.ctl.addEventListener('change',draw3d)}
+ V.ready=true;size3d();
+ }catch(e){el.innerHTML='<p class="note" style="padding:16px">3D view needs WebGL, which is not available here.</p>'}
+}
+function size3d(){if(!V.ready)return;var el=$('v3'),w=el.clientWidth,h=el.clientHeight;V.r.setSize(w,h);V.cam.aspect=w/h;V.cam.updateProjectionMatrix();draw3d()}
+function draw3d(){if(V.ready)V.r.render(V.s,V.cam)}
+function update3d(p,e){
+ if(!V.ready)return;
+ var key=[p.len,p.wid,p.hgt,p.axis].join();
+ if(key!==V.key){V.key=key;
+  while(V.grp.children.length)V.grp.remove(V.grp.children[0]);while(V.lab.children.length)V.lab.remove(V.lab.children[0]);
+  var L=p.len,Wd=p.wid,H=p.hgt;
+  var tl=panelTex(L/20),ts=panelTex(Wd/20);
+  var side=function(t){return new THREE.MeshLambertMaterial({map:t})};
+  var roofM=new THREE.MeshLambertMaterial({color:0xe6e4de});
+  var mats=[side(ts),side(ts),roofM,roofM,side(tl),side(tl)];
+  var b=new THREE.Mesh(new THREE.BoxGeometry(L,H,Wd),mats);b.position.y=H/2;b.castShadow=true;b.receiveShadow=true;V.grp.add(b);
+  var pm=new THREE.MeshLambertMaterial({color:0xd4d1c9});
+  [[L,2.5,1,0,Wd/2],[L,2.5,1,0,-Wd/2],[1,2.5,Wd,L/2,0],[1,2.5,Wd,-L/2,0]].forEach(function(q){var m=new THREE.Mesh(new THREE.BoxGeometry(q[0],q[1],q[2]),pm);m.position.set(q[3],H+1.25,q[4]);m.castShadow=true;V.grp.add(m)});
+  var nx=Math.max(2,Math.round(L/70)),nz=Math.max(2,Math.round(Wd/70)),um=new THREE.MeshLambertMaterial({color:0x9aa3a8});
+  for(var i=0;i<nx;i++)for(var j=0;j<nz;j++){if((i+j)%2)continue;var u=new THREE.Mesh(new THREE.BoxGeometry(10,4.5,6),um);u.position.set(-L/2+L*(i+0.5)/nx,H+2.25,-Wd/2+Wd*(j+0.5)/nz);u.castShadow=true;V.grp.add(u)}
+  V.grp.rotation.y=(90-p.axis)*RAD;V.lab.rotation.y=0;
+  V.pad.scale.set(L+160,Wd+160,1);V.pad.rotation.z=-V.grp.rotation.y;V.pad.rotation.set(-Math.PI/2,0,V.grp.rotation.y,'YXZ');
+  // wall labels at outward normals
+  var thv=p.axis*RAD;
+  walls(p).forEach(function(w){var a=w.az*RAD,dist=(Math.abs(Math.sin(a-thv))>0.5?Wd:L)/2;
+   var sp=lbl(card(w.az)+' wall','#14202b');sp.position.set(Math.sin(a)*(dist+45),H+18,-Math.cos(a)*(dist+45));V.lab.add(sp)});
+  var n=lbl('N ↑','#c2412d');n.position.set(0,6,-(Math.max(L,Wd)/2+130));V.lab.add(n);
+  var big=Math.max(L,Wd);V.cam.position.set(big*0.95,big*0.6,big*1.05);if(V.ctl){V.ctl.target.set(0,H/3,0);V.ctl.update()}
+ }
+ var up=e.alt>0.01,ca=Math.cos(e.alt),az=e.az*RAD;
+ V.sun.intensity=up?1.15:0;V.hemi.intensity=up?0.55:0.25;
+ V.sun.position.set(Math.sin(az)*ca*900,Math.max(0.05,Math.sin(e.alt))*900,-Math.cos(az)*ca*900);
+ V.s.background=new THREE.Color(up?(e.alt<0.15?0xf0c9a0:0xbcd8f0):0x1b2635);
+ draw3d();
+}
 // ---------- UI ----------
 var state={day:196};
 var mb=$('months');
@@ -232,7 +296,7 @@ function render(){
   ['Cooling cost',' $'+fmt(kwhC*p.cost,0),'at $'+p.cost.toFixed(2)+'/kWh'],['Outdoor high',fmt(hi)+' °F','low '+fmt(Math.min.apply(null,r.map(function(x){return x.To})))+' °F']];
  if(kwhH>0.5)tiles.splice(2,0,['Heating energy',fmt(kwhH)+' kWh','heat pump equivalent']);
  $('tiles').innerHTML=tiles.map(function(t){return '<div class="tile"><div class="k">'+t[0]+'</div><div class="v">'+t[1]+'</div><div class="s">'+t[2]+'</div></div>'}).join('');
- drawPlan(p,n,hs,c,off);drawHourly(r,hs);drawStack(r[hs]);drawWalls(p,n,r,c,off);drawAnnual(p,c,off,occDay,d.getMonth());
+ drawPlan(p,n,hs,c,off);try{update3d(p,envAt(n,hs+0.5,c,off))}catch(err){}drawHourly(r,hs);drawStack(r[hs]);drawWalls(p,n,r,c,off);drawAnnual(p,c,off,occDay,d.getMonth());
 }
 function drawPlan(p,n,hs,c,off){
  var e=envAt(n,hs+0.5,c,off),W=walls(p),th=p.axis*RAD;
@@ -316,7 +380,7 @@ function drawAnnual(p,c,off,occDay,cm){
  $('annNote').textContent='Estimated '+fmt(tot)+' kWh of cooling electricity a year (about $'+fmt(tot*p.cost)+') with the current inputs, weekday and weekend mix. Selected month shown in orange. Unit: kWh.';
 }
 document.addEventListener('input',function(e){if(e.target.closest('.wrap'))render()});
-window.addEventListener('resize',render);
+window.addEventListener('resize',function(){size3d();render()});init3d();
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render)}catch(_){}
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 render();
