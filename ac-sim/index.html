@@ -1,0 +1,324 @@
+<title>Ayala Dr Cooling Load</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: sticky-free single column on phones, 2-col dashboard on desktop. Warm sun-vs-cool palette for heat load. */
+:root{--bg:#f4f6f8;--panel:#ffffff;--fg:#14202b;--mute:#5b6b7a;--line:#d9e0e6;--cool:#1f6fb2;--cool2:#8fc0e8;--sun:#e0771a;--heat:#c2412d;--ok:#2a8a5a;--chip:#e8eef3;--grid:#e6ebef;--head:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e151c;--panel:#16202a;--fg:#e6edf3;--mute:#92a3b3;--line:#27343f;--cool:#5aa9ea;--cool2:#2b5a82;--sun:#f0954a;--heat:#ec7c68;--ok:#58c28d;--chip:#1f2c38;--grid:#202c37;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e151c;--panel:#16202a;--fg:#e6edf3;--mute:#92a3b3;--line:#27343f;--cool:#5aa9ea;--cool2:#2b5a82;--sun:#f0954a;--heat:#ec7c68;--ok:#58c28d;--chip:#1f2c38;--grid:#202c37;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--body);padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px}
+h1{font:700 26px/1.15 var(--head);margin:0;text-wrap:balance}
+h2{font:700 15px var(--head);margin:0 0 10px;letter-spacing:.01em}
+.sub{color:var(--mute);margin:4px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.tile .k{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.tile .v{font:700 26px var(--head);font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:var(--mute)}
+.months{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}
+.months button{font:500 13px var(--body);background:var(--chip);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
+.months button[aria-pressed=true]{background:var(--cool);color:#fff;border-color:var(--cool)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
+.ctl{display:grid;grid-template-columns:1fr;gap:12px}
+.row{display:grid;gap:4px}
+.row label{display:flex;justify-content:space-between;gap:8px;font-weight:500}
+.row output{font-variant-numeric:tabular-nums;color:var(--cool);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--cool)}
+input[type=number],select{width:100%;font:14px var(--body);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+canvas{width:100%;display:block}
+svg text{font-family:var(--body)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--mute);font-weight:500}
+.scroll{overflow-x:auto}
+.bar{height:8px;background:var(--chip);border-radius:4px;min-width:60px}
+.bar i{display:block;height:100%;background:var(--sun);border-radius:4px}
+.stack{display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--chip)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px;color:var(--mute)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+details{margin-top:8px}summary{cursor:pointer;font-weight:600}
+.inputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:12px}
+.inputs label{font-size:12px;color:var(--mute);display:block;margin-bottom:2px}
+.note{font-size:12px;color:var(--mute)}
+.note b{color:var(--fg)}
+.warn{border-left:3px solid var(--sun);padding-left:10px}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Air conditioning power simulation</h1>
+    <p class="sub">1365 N Ayala Dr, Rialto, CA 92376 &middot; hourly cooling load and electric demand by time of year</p>
+  </header>
+
+  <div class="panel warn note">
+    <b>Building size and orientation are assumptions.</b> I could not find a public record for this address, so the defaults are a generic single-story industrial building (200 ft &times; 100 ft, 28 ft walls, long axis east-west). Open <b>Building &amp; system inputs</b> and enter the real dimensions, and the street-facing direction, from the county assessor record or a site visit. Weather is a typical-day estimate for Rialto (34.1&deg;N), not measured data.
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>Time of year</h2>
+      <div class="months" id="months" role="group" aria-label="Month"></div>
+      <div class="ctl">
+        <div class="row"><label for="day">Date <output id="dayO"></output></label><input type="range" id="day" min="1" max="365" value="196"></div>
+        <div class="row"><label for="hour">Hour for sun view <output id="hourO"></output></label><input type="range" id="hour" min="0" max="23" value="15"></div>
+        <div class="row"><label for="dtype">Day type</label>
+          <select id="dtype"><option value="1">Weekday (occupied)</option><option value="0">Weekend (unoccupied)</option></select></div>
+        <div class="row"><label for="toff">Temperature offset (heat wave) <output id="toffO"></output></label><input type="range" id="toff" min="-10" max="20" value="0"></div>
+        <div class="row"><label for="clr">Sky clearness <output id="clrO"></output></label><input type="range" id="clr" min="0" max="100" value="100"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Building plan and sun-facing walls</h2>
+      <svg id="plan" viewBox="0 0 380 300" role="img" aria-label="Plan view of building with sun direction" style="width:100%;height:auto;max-height:340px"></svg>
+      <div class="note" id="planNote"></div>
+    </section>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="panel">
+    <h2>Hourly electric demand and outdoor temperature</h2>
+    <canvas id="hourly" height="260"></canvas>
+    <div class="legend"><span><i style="background:var(--cool)"></i>Cooling kW</span><span><i style="background:var(--heat)"></i>Heating kW</span><span><i style="background:var(--sun)"></i>Outdoor temp &deg;F</span></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>What drives the load at the selected hour</h2>
+      <div class="stack" id="stack"></div>
+      <div class="legend" id="stackLeg"></div>
+      <p class="note" id="stackNote"></p>
+    </section>
+    <section class="panel">
+      <h2>Heat gain by wall, whole day</h2>
+      <div class="scroll"><table id="walls"></table></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Cooling electricity by month</h2>
+    <canvas id="annual" height="220"></canvas>
+    <p class="note" id="annNote"></p>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>Building &amp; system inputs</summary>
+      <div class="inputs" id="inputs"></div>
+      <p class="note">Simplified hourly model: clear-sky solar geometry for the chosen date, wall and roof sol-air temperatures with a 2&ndash;3 hour thermal lag, window solar gain, ventilation and infiltration, lighting, equipment and people, and rooftop-unit efficiency that falls as outdoor temperature rises. Indoor temperature is held at setpoint, so thermal mass storage is ignored. Treat results as an estimate for comparing seasons and orientations, not a utility bill forecast.</p>
+    </details>
+  </section>
+</div>
+
+<script>
+(function(){
+var LAT=34.1286, LON=-117.37, LSTM=-120;
+var HI=[68,69,72,77,82,90,98,98,94,85,76,68], LO=[42,44,46,50,55,60,65,65,62,55,47,42];
+var MD=[31,28,31,30,31,30,31,31,30,31,30,31];
+var SPEC=[
+ ['len','Length (ft)',200,20,1000,5],['wid','Width (ft)',100,20,600,5],['hgt','Wall height (ft)',28,8,60,1],
+ ['axis','Long-axis bearing (° from N)',90,0,179,5],['winf','Window share of wall (%)',4,0,60,1],
+ ['uwall','Wall U (Btu/h·ft²·°F)',0.25,0.03,1,0.01],['uroof','Roof U',0.06,0.02,0.5,0.01],
+ ['awall','Wall solar absorptance',0.5,0.1,0.95,0.05],['aroof','Roof solar absorptance',0.4,0.1,0.95,0.05],
+ ['shgc','Window SHGC',0.35,0.1,0.9,0.05],['uwin','Window U',0.6,0.2,1.2,0.05],
+ ['tcool','Cooling setpoint (°F)',75,68,82,1],['tsb','Unoccupied cooling setback (°F)',85,78,95,1],
+ ['theat','Heating setpoint (°F)',68,60,74,1],['thsb','Unoccupied heating setback (°F)',60,50,68,1],
+ ['t0','Occupied from (hour)',6,0,23,1],['t1','Occupied until (hour)',18,1,24,1],
+ ['lpd','Lighting (W/ft²)',0.8,0,3,0.1],['epd','Equipment (W/ft²)',0.5,0,5,0.1],['ppl','People',40,0,500,5],
+ ['vent','Ventilation (cfm/ft²)',0.15,0,1,0.05],['ach','Infiltration (air changes/h)',0.15,0,2,0.05],
+ ['eer','Cooling EER at 95°F',11,7,20,0.5],['cost','Electricity price ($/kWh)',0.2,0.05,0.6,0.01]
+];
+var $=function(i){return document.getElementById(i)};
+var ihtml='';SPEC.forEach(function(s){ihtml+='<div><label for="'+s[0]+'">'+s[1]+'</label><input type="number" id="'+s[0]+'" value="'+s[2]+'" min="'+s[3]+'" max="'+s[4]+'" step="'+s[5]+'"></div>'});
+$('inputs').innerHTML=ihtml;
+function P(){var p={};SPEC.forEach(function(s){var v=parseFloat($(s[0]).value);p[s[0]]=isNaN(v)?s[2]:Math.min(s[4],Math.max(s[3],v))});return p}
+var RAD=Math.PI/180;
+function dateOf(n){return new Date(2025,0,n)}
+function envAt(n,t,c,off){
+ var B=2*Math.PI*(n-81)/364,eot=9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B);
+ var st=t+(eot+4*(LON-LSTM))/60,h=15*(st-12)*RAD;
+ var dec=23.45*Math.sin(2*Math.PI*(284+n)/365)*RAD,la=LAT*RAD;
+ var sa=Math.sin(la)*Math.sin(dec)+Math.cos(la)*Math.cos(dec)*Math.cos(h);
+ var alt=Math.asin(Math.max(-1,Math.min(1,sa)));
+ var east=-Math.cos(dec)*Math.sin(h),north=Math.sin(dec)*Math.cos(la)-Math.cos(dec)*Math.sin(la)*Math.cos(h);
+ var az=Math.atan2(east,north)/RAD;if(az<0)az+=360;
+ // outdoor temp: interpolate monthly mid-month highs/lows
+ var d=dateOf(n),m=d.getMonth(),f=(d.getDate()-15)/MD[m],m2=f>=0?(m+1)%12:(m+11)%12,w=Math.abs(f);
+ var hi=HI[m]*(1-w)+HI[m2]*w,lo=LO[m]*(1-w)+LO[m2]*w;
+ var To=(hi+lo)/2+(hi-lo)/2*Math.cos(2*Math.PI*(t-15)/24)+off;
+ var dni=0,dh=0;
+ if(alt>0.01){
+  var a=alt/RAD,am=1/(sa+0.50572*Math.pow(a+6.07995,-1.6364)),hk=0.36;
+  var ext=1+0.034*Math.cos(2*Math.PI*n/365);
+  var dc=1353*ext*((1-0.14*hk)*Math.pow(0.7,Math.pow(am,0.678))+0.14*hk);
+  dni=dc*c*c;dh=0.1*dc*(c+(1-c)*2.2);
+ }
+ return {alt:alt,az:az,dni:dni,dh:dh,To:To,hi:hi,lo:lo,c:c};
+}
+var F=0.3170; // W/m2 -> Btu/h/ft2
+function wallI(e,wa){ // Btu/h/ft2 on vertical wall, plus direct part W/m2
+ if(e.alt<=0.01)return {tot:0,dir:0,cos:0,totW:0};
+ var cs=Math.cos(e.alt)*Math.cos((e.az-wa)*RAD),dir=e.dni*Math.max(0,cs);
+ var gr=0.2*(e.dni*Math.sin(e.alt)+e.dh)*0.5,dif=e.dh*0.5;
+ return {tot:(dir+dif+gr)*F,dir:dir,cos:cs,totW:dir+dif+gr};
+}
+function roofI(e){return e.alt>0.01?(e.dni*Math.sin(e.alt)+e.dh)*F:0}
+function walls(p){
+ var a=p.axis,H=p.hgt;
+ return [{az:(a+90)%360,A:p.len*H},{az:(a+270)%360,A:p.len*H},{az:a%360,A:p.wid*H},{az:(a+180)%360,A:p.wid*H}];
+}
+var CARD=['N','NE','E','SE','S','SW','W','NW'];
+function card(az){return CARD[Math.round(az/45)%8]}
+function eerF(To,p){return p.eer*Math.max(0.6,Math.min(1.5,1+0.012*(95-To)))}
+function sim(n,occDay,p,c,off){
+ var W=walls(p),Af=p.len*p.wid,Aroof=Af,vol=Af*p.hgt,ho=3,out=[];
+ for(var h=0;h<24;h++){
+  var t=h+0.5,e=envAt(n,t,c,off),eL3=envAt(n,t-3,c,off),eL2=envAt(n,t-2,c,off);
+  var occ=occDay&&t>=p.t0&&t<p.t1;
+  function load(Tin){
+   var r={};
+   var tsr=eL2.To+p.aroof*roofI(eL2)/ho-7*c*(eL2.alt>0.01?0.4:1);
+   r.roof=p.uroof*Aroof*(tsr-Tin);
+   r.wall=0;r.win=0;r.perWall=[];
+   W.forEach(function(w,i){
+    var Aw=w.A*p.winf/100,Ao=w.A-Aw;
+    var tsa=eL3.To+p.awall*wallI(eL3,w.az).tot/ho;
+    var qw=p.uwall*Ao*(tsa-Tin);
+    var qv=p.uwin*Aw*(e.To-Tin)+p.shgc*0.87*Aw*wallI(e,w.az).tot;
+    r.wall+=qw;r.win+=qv;r.perWall.push(qw+qv);
+   });
+   var cfm=(occ?p.vent*Af:0)+p.ach*vol/60;
+   r.vent=1.08*cfm*(e.To-Tin);
+   r.int=(p.lpd+p.epd*(occ?1:0.2))*Af*3.412*(occ?1:0.1)+(occ?p.ppl*450:0);
+   if(!occ)r.int=(p.lpd*0.1+p.epd*0.2)*Af*3.412+0;
+   r.Q=r.roof+r.wall+r.win+r.vent+r.int;
+   return r;
+  }
+  var Tc=occ?p.tcool:p.tsb,Th=occ?p.theat:p.thsb;
+  var L=load(Tc),mode='off',kc=0,kh=0,fan=0.00025*Af;
+  if(L.Q>0){mode='cool';kc=L.Q*1.1/(eerF(e.To,p)*1000)+fan}
+  else{var Lh=load(Th);if(Lh.Q<0){mode='heat';var cop=Math.max(1.8,Math.min(3.5,2+0.04*(e.To-17)));kh=-Lh.Q/(3412*cop)+fan;L=Lh}}
+  out.push({h:h,t:t,e:e,occ:occ,mode:mode,kc:kc,kh:kh,L:L,Q:L.Q,To:e.To});
+ }
+ return out;
+}
+function sum(a,f){return a.reduce(function(s,x){return s+f(x)},0)}
+// ---------- UI ----------
+var state={day:196};
+var mb=$('months');
+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].forEach(function(nm,i){
+ var b=document.createElement('button');b.textContent=nm;b.type='button';b.dataset.m=i;
+ b.addEventListener('click',function(){$('day').value=Math.round((new Date(2025,i,15)-new Date(2025,0,0))/864e5);render()});mb.appendChild(b)});
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function fmt(x,d){return x.toLocaleString('en-US',{maximumFractionDigits:d==null?0:d,minimumFractionDigits:d==null?0:d})}
+function hourLabel(h){var s=h%12===0?12:h%12;return s+(h<12?' AM':' PM')}
+function render(){
+ var p=P(),n=+$('day').value,hs=+$('hour').value,occDay=$('dtype').value==='1',off=+$('toff').value,c=+$('clr').value/100;
+ var d=dateOf(n);
+ $('dayO').textContent=d.toLocaleDateString('en-US',{month:'long',day:'numeric'});
+ $('hourO').textContent=hourLabel(hs);$('toffO').textContent=(off>0?'+':'')+off+' °F';$('clrO').textContent=Math.round(c*100)+'%';
+ Array.prototype.forEach.call(mb.children,function(b){b.setAttribute('aria-pressed',String(+b.dataset.m===d.getMonth()))});
+ var r=sim(n,occDay,p,c,off);
+ var kwhC=sum(r,function(x){return x.kc}),kwhH=sum(r,function(x){return x.kh});
+ var pk=r.reduce(function(a,b){return b.kc>a.kc?b:a},r[0]);
+ var hi=Math.max.apply(null,r.map(function(x){return x.To}));
+ var tiles=[['Cooling energy',fmt(kwhC)+' kWh','per day'],['Peak cooling demand',fmt(pk.kc,1)+' kW',pk.kc>0?'at '+hourLabel(pk.h)+' · '+fmt(pk.Q/12000,1)+' tons':'no cooling needed'],
+  ['Cooling cost',' $'+fmt(kwhC*p.cost,0),'at $'+p.cost.toFixed(2)+'/kWh'],['Outdoor high',fmt(hi)+' °F','low '+fmt(Math.min.apply(null,r.map(function(x){return x.To})))+' °F']];
+ if(kwhH>0.5)tiles.splice(2,0,['Heating energy',fmt(kwhH)+' kWh','heat pump equivalent']);
+ $('tiles').innerHTML=tiles.map(function(t){return '<div class="tile"><div class="k">'+t[0]+'</div><div class="v">'+t[1]+'</div><div class="s">'+t[2]+'</div></div>'}).join('');
+ drawPlan(p,n,hs,c,off);drawHourly(r,hs);drawStack(r[hs]);drawWalls(p,n,r,c,off);drawAnnual(p,c,off,occDay,d.getMonth());
+}
+function drawPlan(p,n,hs,c,off){
+ var e=envAt(n,hs+0.5,c,off),W=walls(p),th=p.axis*RAD;
+ var u=[Math.sin(th),-Math.cos(th)],v=[Math.cos(th),Math.sin(th)],cx=190,cy=150;
+ var ext=Math.abs(u[0])*p.len+Math.abs(v[0])*p.wid,eyy=Math.abs(u[1])*p.len+Math.abs(v[1])*p.wid;
+ var s=Math.min(115/ext,85/eyy);
+ var hl=p.len/2*s,hw=p.wid/2*s;
+ function pt(a,b){return [cx+a*u[0]*hl+b*v[0]*hw,cy+a*u[1]*hl+b*v[1]*hw]}
+ var C=[pt(-1,-1),pt(1,-1),pt(1,1),pt(-1,1)];
+ var tc=css('--fg'),mu=css('--mute'),sun=css('--sun'),pan=css('--chip'),cool=css('--cool');
+ var s2='';
+ s2+='<text x="'+(cx-0)+'" y="22" text-anchor="middle" fill="'+mu+'" font-size="12">N</text><path d="M'+cx+' 28 l-5 10 h10z" fill="'+mu+'"/>';
+ s2+='<polygon points="'+C.map(function(q){return q.join(',')}).join(' ')+'" fill="'+pan+'" stroke="none"/>';
+ // wall edges: len walls normal a+90 (+v side => b=+1) ; map edges
+ var edges=[[C[3],C[2],(p.axis+90)%360,W[0]],[C[0],C[1],(p.axis+270)%360,W[1]],[C[1],C[2],p.axis%360,W[2]],[C[0],C[3],(p.axis+180)%360,W[3]]];
+ // fix: edge between b=+1 corners is C[2]-C[3]? corners ordered (-1,-1),(1,-1),(1,1),(-1,1): b=+1 edge = C[2],C[3]; b=-1 edge= C[0],C[1]; a=+1 edge = C[1],C[2]; a=-1 edge=C[0],C[3]
+ var lab='';
+ edges.forEach(function(E){
+  var wi=wallI(e,E[2]),f=Math.min(1,wi.totW/900||0),dirf=Math.min(1,wi.dir/900);
+  var col=wi.cos>0.02&&e.alt>0.01?sun:cool,op=wi.cos>0.02&&e.alt>0.01?(0.35+0.65*dirf):0.5;
+  s2+='<line x1="'+E[0][0]+'" y1="'+E[0][1]+'" x2="'+E[1][0]+'" y2="'+E[1][1]+'" stroke="'+col+'" stroke-opacity="'+op+'" stroke-width="9" stroke-linecap="butt"/>';
+  var mx=(E[0][0]+E[1][0])/2,my=(E[0][1]+E[1][1])/2,na=E[2]*RAD,ox=Math.sin(na)*(24+34*Math.abs(Math.sin(na))),oy=-Math.cos(na)*26;
+  lab+='<text x="'+(mx+ox)+'" y="'+(my+oy)+'" text-anchor="middle" dominant-baseline="middle" fill="'+tc+'" font-size="12" font-weight="600">'+card(E[2])+' wall</text>'+
+   '<text x="'+(mx+ox)+'" y="'+(my+oy+14)+'" text-anchor="middle" dominant-baseline="middle" fill="'+mu+'" font-size="11">'+(e.alt>0.01?fmt(wi.dir)+' W/m² direct':'dark')+'</text>';
+ });
+ s2+=lab;
+ s2+='<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="'+mu+'" font-size="12">'+p.len+' × '+p.wid+' ft</text><text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" fill="'+mu+'" font-size="11">'+fmt(p.len*p.wid)+' ft² · '+p.hgt+' ft walls</text>';
+ if(e.alt>0.01){var sa=e.az*RAD,sx=190+Math.sin(sa)*165,sy=150-Math.cos(sa)*125;
+  s2+='<line x1="'+sx+'" y1="'+sy+'" x2="'+(190+Math.sin(sa)*100)+'" y2="'+(150-Math.cos(sa)*70)+'" stroke="'+sun+'" stroke-width="2" stroke-dasharray="4 3"/><circle cx="'+sx+'" cy="'+sy+'" r="9" fill="'+sun+'"/>';}
+ $('plan').innerHTML=s2;
+ $('planNote').innerHTML=e.alt>0.01?'At '+hourLabel(hs)+' the sun is '+fmt(e.alt/RAD)+'° above the horizon, bearing '+fmt(e.az)+'° ('+card(e.az)+'). Walls facing it are orange.':'The sun is below the horizon at '+hourLabel(hs)+'.';
+}
+function setup(cv){var dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=+cv.getAttribute('height');cv.width=w*dpr;cv.height=h*dpr;var g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);return {g:g,w:w,h:h}}
+function drawHourly(r,hs){
+ var S=setup($('hourly')),g=S.g,w=S.w,h=S.h,L=44,R=40,T=14,B=28,pw=w-L-R,ph=h-T-B;
+ var mk=Math.max(5,Math.max.apply(null,r.map(function(x){return Math.max(x.kc,x.kh)})))*1.1,mk2=Math.ceil(mk/5)*5;
+ var tmin=Math.floor((Math.min.apply(null,r.map(function(x){return x.To}))-5)/10)*10,tmax=Math.ceil((Math.max.apply(null,r.map(function(x){return x.To}))+5)/10)*10;
+ g.font='11px '+css('--body');g.textBaseline='middle';
+ for(var i=0;i<=4;i++){var y=T+ph-ph*i/4;g.strokeStyle=css('--grid');g.beginPath();g.moveTo(L,y);g.lineTo(L+pw,y);g.stroke();
+  g.fillStyle=css('--mute');g.textAlign='right';g.fillText(fmt(mk2*i/4,mk2<10?1:0),L-6,y);g.textAlign='left';g.fillText(fmt(tmin+(tmax-tmin)*i/4),L+pw+6,y)}
+ g.textAlign='center';for(var hh=0;hh<24;hh+=3){g.fillStyle=css('--mute');g.fillText(hourLabel(hh).replace(' ',''),L+pw*(hh+0.5)/24,T+ph+14)}
+ var bw=pw/24;
+ r.forEach(function(x){var v=x.kc>0?x.kc:x.kh,col=x.kc>0?css('--cool'):css('--heat'),bh=ph*v/mk2;
+  g.globalAlpha=x.h===hs?1:0.75;g.fillStyle=col;g.fillRect(L+x.h*bw+1.5,T+ph-bh,bw-3,bh);g.globalAlpha=1;
+  if(x.h===hs){g.strokeStyle=css('--fg');g.lineWidth=1;g.strokeRect(L+x.h*bw+1,T+1,bw-2,ph-1)}});
+ g.strokeStyle=css('--sun');g.lineWidth=2;g.beginPath();
+ r.forEach(function(x,i){var X=L+bw*(i+0.5),Y=T+ph-ph*(x.To-tmin)/(tmax-tmin);i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();g.lineWidth=1;
+ g.fillStyle=css('--mute');g.textAlign='left';g.fillText('kW',4,T+2);g.textAlign='right';g.fillText('°F',w-4,T+2);
+}
+function drawStack(x){
+ var Lh=x.L,items=[['Roof',Lh.roof,css('--sun')],['Walls',Lh.wall,'#c9a227'],['Windows',Lh.win,'#2a8a5a'],['Ventilation + leaks',Lh.vent,css('--cool')],['Lights, equipment, people',Lh.int,'#8a63c7']];
+ var pos=items.filter(function(i){return i[1]>0}),tot=sum(pos,function(i){return i[1]});
+ $('stack').innerHTML=pos.map(function(i){return '<div title="'+i[0]+'" style="width:'+(100*i[1]/tot)+'%;background:'+i[2]+'"></div>'}).join('');
+ $('stackLeg').innerHTML=items.map(function(i){return '<span><i style="background:'+i[2]+'"></i>'+i[0]+' '+fmt(i[1]/1000,1)+' kBtu/h</span>'}).join('');
+ $('stackNote').textContent='Net at '+hourLabel(x.h)+': '+fmt(x.Q/1000,1)+' kBtu/h ('+fmt(Math.abs(x.Q)/12000,1)+' tons) '+(x.mode==='cool'?'of cooling':x.mode==='heat'?'of heating':'; HVAC idle')+', outdoor '+fmt(x.To)+' °F, '+(x.occ?'occupied':'unoccupied')+'.';
+}
+function drawWalls(p,n,r,c,off){
+ var W=walls(p),rows=[],mx=1;
+ W.forEach(function(w,i){
+  var gain=0,sunH=0,irr=0;
+  r.forEach(function(x){var wi=wallI(x.e,w.az);gain+=Math.max(0,x.L.perWall[i]);if(wi.cos>0.05&&x.e.alt>0.01)sunH++;irr+=wi.totW});
+  var g=gain/3412;mx=Math.max(mx,g);rows.push({n:card(w.az),az:w.az,A:w.A,sunH:sunH,irr:irr/1000,g:g});
+ });
+ var rf=sum(r,function(x){return Math.max(0,x.L.roof)})/3412;mx=Math.max(mx,rf);
+ var h='<tr><th>Wall</th><th>Area ft²</th><th>Direct sun h</th><th>Sun kWh/m²</th><th>Heat in kWh</th><th></th></tr>';
+ rows.forEach(function(w){h+='<tr><td>'+w.n+' ('+fmt(w.az)+'°)</td><td>'+fmt(w.A)+'</td><td>'+w.sunH+'</td><td>'+fmt(w.irr,1)+'</td><td>'+fmt(w.g)+'</td><td><div class="bar"><i style="width:'+(100*w.g/mx)+'%"></i></div></td></tr>'});
+ h+='<tr><td>Roof</td><td>'+fmt(p.len*p.wid)+'</td><td>—</td><td>'+fmt(sum(r,function(x){return roofI(x.e)/F})/1000,1)+'</td><td>'+fmt(rf)+'</td><td><div class="bar"><i style="width:'+(100*rf/mx)+'%"></i></div></td></tr>';
+ $('walls').innerHTML=h;
+}
+function drawAnnual(p,c,off,occDay,cm){
+ var vals=[];for(var m=0;m<12;m++){var n=Math.round((new Date(2025,m,15)-new Date(2025,0,0))/864e5);
+  var wd=sum(sim(n,true,p,c,off),function(x){return x.kc}),we=sum(sim(n,false,p,c,off),function(x){return x.kc});
+  vals.push(MD[m]*(5/7*wd+2/7*we))}
+ var S=setup($('annual')),g=S.g,w=S.w,h=S.h,L=52,R=8,T=12,B=26,pw=w-L-R,ph=h-T-B,mx=Math.max.apply(null,vals)*1.1||1;
+ var nice=Math.pow(10,Math.floor(Math.log10(mx))),st=[1,2,2.5,5,10].map(function(k){return k*nice}).find(function(s){return mx/s<=5})||nice*10,top=Math.ceil(mx/st)*st;
+ g.font='11px '+css('--body');g.textBaseline='middle';
+ for(var v=0;v<=top+1e-6;v+=st){var y=T+ph-ph*v/top;g.strokeStyle=css('--grid');g.beginPath();g.moveTo(L,y);g.lineTo(L+pw,y);g.stroke();g.fillStyle=css('--mute');g.textAlign='right';g.fillText(fmt(v/1000,v/1000<10?1:0)+'k',L-6,y)}
+ var bw=pw/12,nm=['J','F','M','A','M','J','J','A','S','O','N','D'];
+ vals.forEach(function(v,i){var bh=ph*v/top;g.fillStyle=i===cm?css('--sun'):css('--cool');g.globalAlpha=i===cm?1:0.8;g.fillRect(L+i*bw+4,T+ph-bh,bw-8,bh);g.globalAlpha=1;g.fillStyle=css('--mute');g.textAlign='center';g.fillText(nm[i],L+i*bw+bw/2,T+ph+14)});
+ var tot=sum(vals,function(v){return v});
+ $('annNote').textContent='Estimated '+fmt(tot)+' kWh of cooling electricity a year (about $'+fmt(tot*p.cost)+') with the current inputs, weekday and weekend mix. Selected month shown in orange. Unit: kWh.';
+}
+document.addEventListener('input',function(e){if(e.target.closest('.wrap'))render()});
+window.addEventListener('resize',render);
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render)}catch(_){}
+new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+render();
+})();
+</script>
