@@ -84,7 +84,7 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
     <h2>3D view <span class="note" style="font-weight:400">drag to rotate, scroll or pinch to zoom</span></h2>
     <label class="note" style="display:block;margin-bottom:8px"><input type="checkbox" id="sat" checked> Show aerial photo on the ground (lines up with the measured size and bearing only)</label>
     <div id="v3" style="height:380px;border-radius:8px;overflow:hidden;background:var(--chip);touch-action:none"></div>
-    <p class="note" id="v3note">Massing model from the dimensions above; dock doors are drawn on the southeast wall, where trailers are parked in the aerial. Aerial image: screenshot of Google Maps imagery supplied by the page owner. Sun position and shadows follow the date and hour. The two-story glass entry at the southwest end follows the listing photos; wall panel joints, roof units and dock door spacing are illustrative, and the clipped east corner is not modeled.</p>
+    <p class="note" id="v3note">Massing model from the dimensions above; dock doors are drawn on the southeast wall, where trailers are parked in the aerial. Aerial image: screenshot of Google Maps imagery supplied by the page owner. Sun position and shadows follow the date and hour. The two-story glass entry at the north (northeast) end follows the listing photos; wall panel joints, roof units and dock door spacing are illustrative, and the clipped east corner is not modeled.</p>
   </section>
 
   <div class="tiles" id="tiles"></div>
@@ -261,10 +261,10 @@ function update3d(p,e){
   [[L,2.5,1,0,Wd/2],[L,2.5,1,0,-Wd/2],[1,2.5,Wd,L/2,0],[1,2.5,Wd,-L/2,0]].forEach(function(q){var m=new THREE.Mesh(new THREE.BoxGeometry(q[0],q[1],q[2]),pm);m.position.set(q[3],H+1.25,q[4]);m.castShadow=true;V.grp.add(m)});
   var nx=Math.max(2,Math.round(L/70)),nz=Math.max(2,Math.round(Wd/70)),um=new THREE.MeshLambertMaterial({color:0x9aa3a8});
   for(var i=0;i<nx;i++)for(var j=0;j<nz;j++){if((i+j)%2)continue;var u=new THREE.Mesh(new THREE.BoxGeometry(10,4.5,6),um);u.position.set(-L/2+L*(i+0.5)/nx,H+2.25,-Wd/2+Wd*(j+0.5)/nz);u.castShadow=true;V.grp.add(u)}
-  var ew=Math.min(90,Wd*0.55),dep=14,eh=H+4,zc=Wd*0.08,ex=-L/2-dep/2;
+  var ew=Math.min(90,Wd*0.55),dep=14,eh=H+4,zc=-Wd*0.14,ex=L/2+dep/2;
   var eb=new THREE.Mesh(new THREE.BoxGeometry(dep,eh,ew),new THREE.MeshLambertMaterial({color:0x6a6f77}));eb.position.set(ex,eh/2,zc);eb.castShadow=true;eb.receiveShadow=true;V.grp.add(eb);
-  var gl=new THREE.Mesh(new THREE.PlaneGeometry(ew*0.6,eh*0.62),new THREE.MeshLambertMaterial({color:0x2f8f94,emissive:0x0b2e30}));gl.rotation.y=-Math.PI/2;gl.position.set(-L/2-dep-0.3,eh*0.46,zc);V.grp.add(gl);
-  var cp=new THREE.Mesh(new THREE.BoxGeometry(9,0.8,ew*0.64),new THREE.MeshLambertMaterial({color:0xb9bcc0}));cp.position.set(-L/2-dep-4,eh*0.3,zc);cp.castShadow=true;V.grp.add(cp);
+  var gl=new THREE.Mesh(new THREE.PlaneGeometry(ew*0.6,eh*0.62),new THREE.MeshLambertMaterial({color:0x2f8f94,emissive:0x0b2e30}));gl.rotation.y=Math.PI/2;gl.position.set(L/2+dep+0.3,eh*0.46,zc);V.grp.add(gl);
+  var cp=new THREE.Mesh(new THREE.BoxGeometry(9,0.8,ew*0.64),new THREE.MeshLambertMaterial({color:0xb9bcc0}));cp.position.set(L/2+dep+4,eh*0.3,zc);cp.castShadow=true;V.grp.add(cp);
   var dm=new THREE.MeshLambertMaterial({color:0x3a3d40});for(var d=-0.38;d<=0.38;d+=0.06){var dr=new THREE.Mesh(new THREE.PlaneGeometry(9,10),dm);dr.position.set(d*L,5,Wd/2+0.3);V.grp.add(dr)}
   V.grp.rotation.y=(90-p.axis)*RAD;V.lab.rotation.y=0;
   V.pad.scale.set(L+160,Wd+160,1);V.pad.rotation.z=-V.grp.rotation.y;V.pad.rotation.set(-Math.PI/2,0,V.grp.rotation.y,'YXZ');
