@@ -160,7 +160,7 @@ def progress(x, y, w, h, tag, vmax, color, name=None):
     I[wid] = {"id": wid, "type": "svg-ext-gauge_progress", "name": name or tag, "label": "HtmlProgress",
                   "property": ev({}, tag, [{"type": "minmax", "min": 0, "max": str(vmax), "style": [True, True], "color": color}])}
 
-CHART_DEAD = 53   # FUXA reserves ~53 px below the plot (legend/title space) even with the legend off: the container is made
+CHART_DEAD = 60   # FUXA reserves ~53 px below the plot even with the legend off (more than ~60 makes the canvas paint over the section titles): the container is made
                   # that much taller than the visible panel so the plot fills the panel; the overhang is covered by what follows
 def chart(x, y, w, h, chart_id, ctype, name, ymax):
     wid = uid("HXC_")
