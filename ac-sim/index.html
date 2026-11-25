@@ -57,7 +57,7 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
   </header>
 
   <div class="panel warn note">
-    <b>Size is from county records; footprint and orientation are assumptions.</b> LoopNet lists the property as a 67,742 SF warehouse on a 4.32 acre lot (APN 0264-212-62, parcel map 20004). It gives no footprint, wall height or compass bearing, so the defaults are a 308 &times; 220 ft rectangle (about 67,760 ft&sup2;), 32 ft walls and a long axis running east-west. Open <b>Building &amp; system inputs</b> to correct the length, width, height and bearing. The model also treats the whole floor as air conditioned; many warehouses cool only offices or part of the floor, so real use may be lower. Weather is a typical-day estimate for Rialto (34.1&deg;N), not measured data.
+    <b>Size is from county records; footprint and direction are read from the aerial photo.</b> LoopNet lists the property as a 67,742 SF warehouse on a 4.32 acre lot (APN 0264-212-62). The aerial shows the building as a rectangle running parallel to the curved road, with its long axis at about 35&deg; from north. The defaults are 340 &times; 200 ft (about 68,000 ft&sup2;) and 32 ft walls. These are estimates, so open <b>Building &amp; system inputs</b> to correct them. The model also treats the whole floor as air conditioned; many warehouses cool only offices or part of the floor, so real use may be lower. Weather is a typical-day estimate for Rialto (34.1&deg;N), not measured data.
   </div>
 
   <div class="grid2">
@@ -122,8 +122,8 @@ var LAT=34.1286, LON=-117.37, LSTM=-120;
 var HI=[68,69,72,77,82,90,98,98,94,85,76,68], LO=[42,44,46,50,55,60,65,65,62,55,47,42];
 var MD=[31,28,31,30,31,30,31,31,30,31,30,31];
 var SPEC=[
- ['len','Length (ft)',308,20,1500,2],['wid','Width (ft)',220,20,900,2],['hgt','Wall height (ft)',32,8,60,1],
- ['axis','Long-axis bearing (° from N)',90,0,179,5],['winf','Window share of wall (%)',2,0,60,1],
+ ['len','Length (ft)',340,20,1500,2],['wid','Width (ft)',200,20,900,2],['hgt','Wall height (ft)',32,8,60,1],
+ ['axis','Long-axis bearing (° from N)',35,0,179,5],['winf','Window share of wall (%)',2,0,60,1],
  ['uwall','Wall U (Btu/h·ft²·°F)',0.25,0.03,1,0.01],['uroof','Roof U',0.06,0.02,0.5,0.01],
  ['awall','Wall solar absorptance',0.5,0.1,0.95,0.05],['aroof','Roof solar absorptance',0.4,0.1,0.95,0.05],
  ['shgc','Window SHGC',0.35,0.1,0.9,0.05],['uwin','Window U',0.6,0.2,1.2,0.05],
