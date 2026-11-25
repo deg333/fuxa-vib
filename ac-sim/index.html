@@ -57,7 +57,7 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
   </header>
 
   <div class="panel warn note">
-    <b>Size is from county records; footprint and direction are measured from an aerial photo.</b> LoopNet lists the property as a 67,742 SF warehouse on a 4.32 acre lot (APN 0264-212-62). In the aerial, the roof is a rectangle about 430 &times; 158 ft with its long axis at 36&deg; from north, parallel to N Ayala Dr. The scale is fitted so the footprint matches the recorded area, so the dimensions are good to roughly 5%. Wall height (32 ft) is an assumption. The model also treats the whole floor as air conditioned; many warehouses cool only offices or part of the floor, so real use may be lower. Weather is a typical-day estimate for Rialto (34.1&deg;N), not measured data.
+    <b>Size is from county records; footprint and direction are measured from an aerial photo.</b> LoopNet lists the property as a 67,742 SF warehouse on a 4.32 acre lot (APN 0264-212-62). In the aerial, the roof is a rectangle about 430 &times; 158 ft with its long axis at 36&deg; from north, parallel to N Ayala Dr. The scale is fitted so the footprint matches the recorded area, so the dimensions are good to roughly 5%. Wall height (38 ft) is estimated from street-level photos. The model also treats the whole floor as air conditioned; many warehouses cool only offices or part of the floor, so real use may be lower. Weather is a typical-day estimate for Rialto (34.1&deg;N), not measured data.
   </div>
 
   <div class="grid2">
@@ -84,7 +84,7 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600}
     <h2>3D view <span class="note" style="font-weight:400">drag to rotate, scroll or pinch to zoom</span></h2>
     <label class="note" style="display:block;margin-bottom:8px"><input type="checkbox" id="sat" checked> Show aerial photo on the ground (lines up with the measured size and bearing only)</label>
     <div id="v3" style="height:380px;border-radius:8px;overflow:hidden;background:var(--chip);touch-action:none"></div>
-    <p class="note" id="v3note">Massing model from the dimensions above; dock doors are drawn on the southeast wall, where trailers are parked in the aerial. Aerial image: screenshot of Google Maps imagery supplied by the page owner. Sun position and shadows follow the date and hour. Roof units, wall panel joints and dock door spacing are illustrative; windows and the clipped east corner are not modeled.</p>
+    <p class="note" id="v3note">Massing model from the dimensions above; dock doors are drawn on the southeast wall, where trailers are parked in the aerial. Aerial image: screenshot of Google Maps imagery supplied by the page owner. Sun position and shadows follow the date and hour. The two-story glass entry at the southwest end follows the listing photos; wall panel joints, roof units and dock door spacing are illustrative, and the clipped east corner is not modeled.</p>
   </section>
 
   <div class="tiles" id="tiles"></div>
@@ -131,7 +131,7 @@ var LAT=34.1286, LON=-117.37, LSTM=-120;
 var HI=[68,69,72,77,82,90,98,98,94,85,76,68], LO=[42,44,46,50,55,60,65,65,62,55,47,42];
 var MD=[31,28,31,30,31,30,31,31,30,31,30,31];
 var SPEC=[
- ['len','Length (ft)',430,20,1500,2],['wid','Width (ft)',158,20,900,2],['hgt','Wall height (ft)',32,8,60,1],
+ ['len','Length (ft)',430,20,1500,2],['wid','Width (ft)',158,20,900,2],['hgt','Wall height (ft)',38,8,60,1],
  ['axis','Long-axis bearing (° from N)',36,0,179,1],['winf','Window share of wall (%)',2,0,60,1],
  ['uwall','Wall U (Btu/h·ft²·°F)',0.25,0.03,1,0.01],['uroof','Roof U',0.06,0.02,0.5,0.01],
  ['awall','Wall solar absorptance',0.5,0.1,0.95,0.05],['aroof','Roof solar absorptance',0.4,0.1,0.95,0.05],
@@ -224,7 +224,7 @@ var SAT='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAcFBQYFBAcGBgYI
 var V={ready:false,key:''};
 function lbl(txt,col){var c=document.createElement('canvas');c.width=256;c.height=64;var g=c.getContext('2d');g.font='600 30px sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineWidth=6;g.strokeStyle='rgba(255,255,255,.9)';g.strokeText(txt,128,32);g.fillStyle=col;g.fillText(txt,128,32);
  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.scale.set(64,16,1);return sp}
-function panelTex(rep){var c=document.createElement('canvas');c.width=256;c.height=128;var g=c.getContext('2d');g.fillStyle='#c9c6bd';g.fillRect(0,0,256,128);g.strokeStyle='#8f8c84';g.lineWidth=3;g.beginPath();g.moveTo(1,0);g.lineTo(1,128);g.stroke();g.strokeStyle='#a9a69d';g.lineWidth=1;g.beginPath();g.moveTo(0,100);g.lineTo(256,100);g.stroke();
+function panelTex(rep){var c=document.createElement('canvas');c.width=256;c.height=128;var g=c.getContext('2d');g.fillStyle='#d9d9d5';g.fillRect(0,0,256,128);g.strokeStyle='#a4a49e';g.lineWidth=3;g.beginPath();g.moveTo(1,0);g.lineTo(1,128);g.stroke();g.lineWidth=1;g.beginPath();g.moveTo(0,42);g.lineTo(256,42);g.moveTo(0,85);g.lineTo(256,85);g.stroke();
  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,1);return t}
 function init3d(){
  var el=$('v3');if(!window.THREE){el.innerHTML='<p class="note" style="padding:16px">3D view could not load.</p>';return}
@@ -254,13 +254,17 @@ function update3d(p,e){
   var L=p.len,Wd=p.wid,H=p.hgt;
   var tl=panelTex(L/20),ts=panelTex(Wd/20);
   var side=function(t){return new THREE.MeshLambertMaterial({map:t})};
-  var roofM=new THREE.MeshLambertMaterial({color:0xe6e4de});
+  var roofM=new THREE.MeshLambertMaterial({color:0xf1f0eb});
   var mats=[side(ts),side(ts),roofM,roofM,side(tl),side(tl)];
   var b=new THREE.Mesh(new THREE.BoxGeometry(L,H,Wd),mats);b.position.y=H/2;b.castShadow=true;b.receiveShadow=true;V.grp.add(b);
   var pm=new THREE.MeshLambertMaterial({color:0xd4d1c9});
   [[L,2.5,1,0,Wd/2],[L,2.5,1,0,-Wd/2],[1,2.5,Wd,L/2,0],[1,2.5,Wd,-L/2,0]].forEach(function(q){var m=new THREE.Mesh(new THREE.BoxGeometry(q[0],q[1],q[2]),pm);m.position.set(q[3],H+1.25,q[4]);m.castShadow=true;V.grp.add(m)});
   var nx=Math.max(2,Math.round(L/70)),nz=Math.max(2,Math.round(Wd/70)),um=new THREE.MeshLambertMaterial({color:0x9aa3a8});
   for(var i=0;i<nx;i++)for(var j=0;j<nz;j++){if((i+j)%2)continue;var u=new THREE.Mesh(new THREE.BoxGeometry(10,4.5,6),um);u.position.set(-L/2+L*(i+0.5)/nx,H+2.25,-Wd/2+Wd*(j+0.5)/nz);u.castShadow=true;V.grp.add(u)}
+  var ew=Math.min(90,Wd*0.55),dep=14,eh=H+4,zc=Wd*0.08,ex=-L/2-dep/2;
+  var eb=new THREE.Mesh(new THREE.BoxGeometry(dep,eh,ew),new THREE.MeshLambertMaterial({color:0x6a6f77}));eb.position.set(ex,eh/2,zc);eb.castShadow=true;eb.receiveShadow=true;V.grp.add(eb);
+  var gl=new THREE.Mesh(new THREE.PlaneGeometry(ew*0.6,eh*0.62),new THREE.MeshLambertMaterial({color:0x2f8f94,emissive:0x0b2e30}));gl.rotation.y=-Math.PI/2;gl.position.set(-L/2-dep-0.3,eh*0.46,zc);V.grp.add(gl);
+  var cp=new THREE.Mesh(new THREE.BoxGeometry(9,0.8,ew*0.64),new THREE.MeshLambertMaterial({color:0xb9bcc0}));cp.position.set(-L/2-dep-4,eh*0.3,zc);cp.castShadow=true;V.grp.add(cp);
   var dm=new THREE.MeshLambertMaterial({color:0x3a3d40});for(var d=-0.38;d<=0.38;d+=0.06){var dr=new THREE.Mesh(new THREE.PlaneGeometry(9,10),dm);dr.position.set(d*L,5,Wd/2+0.3);V.grp.add(dr)}
   V.grp.rotation.y=(90-p.axis)*RAD;V.lab.rotation.y=0;
   V.pad.scale.set(L+160,Wd+160,1);V.pad.rotation.z=-V.grp.rotation.y;V.pad.rotation.set(-Math.PI/2,0,V.grp.rotation.y,'YXZ');
@@ -272,7 +276,7 @@ function update3d(p,e){
   var big=Math.max(L,Wd);V.cam.position.set(big*0.95,big*0.6,big*1.05);if(V.ctl){V.ctl.target.set(0,H/3,0);V.ctl.update()}
  }
  var up=e.alt>0.01,ca=Math.cos(e.alt),az=e.az*RAD;
- V.sun.intensity=up?1.15:0;V.hemi.intensity=up?0.55:0.25;
+ V.sun.intensity=up?0.85:0;V.hemi.intensity=up?0.6:0.25;
  V.sun.position.set(Math.sin(az)*ca*900,Math.max(0.05,Math.sin(e.alt))*900,-Math.cos(az)*ca*900);
  V.s.background=new THREE.Color(up?(e.alt<0.15?0xf0c9a0:0xbcd8f0):0x1b2635);
  draw3d();
